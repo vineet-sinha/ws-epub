@@ -12,7 +12,7 @@ import { crlf } from 'crlf-normalize';
 
 import { SYMBOL_RAW_DATA } from './types';
 import { isEpub } from './epub/isEpub';
-import { IMetadata, IMetadataList, INcx, INcxTree, ISpine, ISpineContents, TocElement } from "./epub/const";
+import { IManifest, IMetadata, IMetadataList, INcx, INcxTree, IRootFile, ISpine, ISpineContents, SpineFragment, TocElement } from "./epub/const";
 
 /**
  *  new EPub(fname[, imageroot][, linkroot])
@@ -68,7 +68,7 @@ export class EPub extends EventEmitter
 		return this.__proto__.constructor;
 	}
 
-	constructor(epubfile: string, imagewebroot?: string, chapterwebroot?: string, ...argv)
+	constructor(epubfile: string, imagewebroot?: string, chapterwebroot?: string)
 	{
 		super();
 
@@ -87,9 +87,9 @@ export class EPub extends EventEmitter
 		}
 	}
 
-	static create(epubfile: string, imagewebroot?: string, chapterwebroot?: string, ...argv)
+	static create(epubfile: string, imagewebroot?: string, chapterwebroot?: string)
 	{
-		let epub = new this(epubfile, imagewebroot, chapterwebroot, ...argv);
+		let epub = new this(epubfile, imagewebroot, chapterwebroot);
 
 		return epub;
 	}
@@ -186,7 +186,7 @@ export class EPub extends EventEmitter
 
 	protected _Elem(element: TocElement)
 	{
-		const SYMBOL_RAW_DATA = this._getStatic().SYMBOL_RAW_DATA;
+		// const SYMBOL_RAW_DATA = this._getStatic().SYMBOL_RAW_DATA;
 
 		if (!element[SYMBOL_RAW_DATA])
 		{
@@ -349,7 +349,7 @@ export class EPub extends EventEmitter
 	 *  Parses elements "metadata," "manifest," "spine" and TOC.
 	 *  Emits "end" if no TOC
 	 **/
-	parseRootFile(rootfile)
+	parseRootFile(rootfile: IRootFile)
 	{
 
 		this.version = rootfile['@'].version || '2.0';
@@ -583,7 +583,7 @@ export class EPub extends EventEmitter
 			}
 		}, this);
 
-		function _meta_val(row, key = null)
+		function _meta_val(row: any, key: string): string
 		{
 			if (key !== null)
 			{
@@ -599,7 +599,7 @@ export class EPub extends EventEmitter
 	 *
 	 *  Parses "manifest" block (all items included, html files, images, styles)
 	 **/
-	parseManifest(manifest)
+	parseManifest(manifest: IManifest)
 	{
 		var i, len, path = this.rootFile.split("/"), element, path_str;
 		path.pop();
@@ -632,7 +632,7 @@ export class EPub extends EventEmitter
 	 *
 	 *  Parses "spine" block (all html elements that are shown to the reader)
 	 **/
-	parseSpine(spine)
+	parseSpine(spine: SpineFragment)
 	{
 		var i, len, path = this.rootFile.split("/"), element;
 		path.pop();
@@ -669,7 +669,8 @@ export class EPub extends EventEmitter
 	 **/
 	parseTOC()
 	{
-		var i, len, path = this.spine.toc.href.split("/"), id_list = {}, keys;
+		var i, len, path = this.spine.toc.href.split("/"), keys;
+		var id_list:Record<string, string> = {};
 		path.pop();
 
 		keys = Object.keys(this.manifest);
@@ -721,7 +722,7 @@ export class EPub extends EventEmitter
 	 *  Walks the NavMap object through all levels and finds elements
 	 *  for TOC
 	 **/
-	walkNavMap(branch, path, id_list, level?: number, pe?: TocElement, parentNcx?: INcxTree, ncx_idx?)
+	walkNavMap(branch: any, path: string[], id_list: Record<string, string>, level?: number, pe?: TocElement, parentNcx?: INcxTree, ncx_idx?: { index: any; }): Array<TocElement>
 	{
 		ncx_idx = ncx_idx || {
 			index: 0,
@@ -737,7 +738,7 @@ export class EPub extends EventEmitter
 			return [];
 		}
 
-		var output = [];
+		var output:Array<TocElement> = [];
 
 		if (!Array.isArray(branch))
 		{
@@ -1011,7 +1012,7 @@ export class EPub extends EventEmitter
 				return callback(new Error(`Invalid mime type for chapter "${chapterId}" ${this.manifest[chapterId]['media-type']}`));
 			}
 
-			this.zip.readFile(this.manifest[chapterId].href, (function (this: EPub, err, data)
+			this.zip.readFile(this.manifest[chapterId].href, (function (this: EPub, err: any, data: Buffer)
 			{
 				if (err)
 				{
@@ -1092,7 +1093,7 @@ export class EPub extends EventEmitter
 		}
 	}
 
-	readFile(filename, options, callback_)
+	readFile(filename: string, options: any, callback_?: any)
 	{
 		let callback = arguments[arguments.length - 1];
 

@@ -1,5 +1,20 @@
 import { SYMBOL_RAW_DATA } from '../types';
 
+export interface IRootFile {
+	['@']?: { version?: string },
+	[key: string]: any,
+}
+export interface IManifest {
+  item: { "@": TocElement }[];
+}
+export interface SpineFragment{
+	['@']?: {
+		toc?: string,
+		idref?: string,
+	},
+	itemref?: SpineFragment | SpineFragment[]
+}
+
 export interface TocElement
 {
 	level?: number;
@@ -19,6 +34,8 @@ export interface TocElement
 	author_link_map?: {
 		[key: string]: string,
 	}
+
+	[SYMBOL_RAW_DATA]?: TocElement,
 }
 
 export interface ISpine
@@ -53,7 +70,7 @@ export interface IMetadata
 	date?: string,
 	ISBN?: string,
 	UUID?: string,
-	cover?
+	// cover?: string
 
 	'file-as'?: string,
 
