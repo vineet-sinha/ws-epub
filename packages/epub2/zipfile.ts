@@ -8,8 +8,8 @@ export interface IZipFile
 {
 	names: string[];
 	count: number;
-	constructor(filename: string);
-	readFile(name: string, cb: (error, buffer: Buffer) => void): void;
+	constructor(filename: string): any;
+	readFile(name: string, cb: (error:any, buffer: Buffer) => void): void;
 }
 
 try
@@ -31,21 +31,21 @@ catch (err)
 		constructor(filename: string)
 		{
 			this.admZip = new AdmZip(filename);
-			this.names = this.admZip.getEntries().map(function (zipEntry)
+			this.names = this.admZip.getEntries().map(function (zipEntry: { entryName: string; })
 			{
 				return zipEntry.entryName;
 			});
 		}
 
-		public readFile(name: string, cb: (error, buffer) => void)
+		public readFile(name: string, cb: (error:string, buffer:Buffer) => void)
 		{
-			this.admZip.readFileAsync(this.admZip.getEntry(name), (buffer, error) =>
+			this.admZip.readFileAsync(this.admZip.getEntry(name), (buffer:Buffer, error:string) =>
 			{
 				if (error || !buffer)
 				{
 					name = decodeURIComponent(name);
 
-					this.admZip.readFileAsync(this.admZip.getEntry(name), (buffer, error) => cb(error, buffer));
+					this.admZip.readFileAsync(this.admZip.getEntry(name), (buffer:Buffer, error:string) => cb(error, buffer));
 				}
 				else
 				{
