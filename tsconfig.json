@@ -2,6 +2,7 @@
   "extends": "@bluelovers/tsconfig/esm/mapfile.json",
   "compilerOptions": {
     "strict": true,
+    "strictNullChecks": true,
     "importHelpers": true
   }
 }

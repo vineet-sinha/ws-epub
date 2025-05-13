@@ -1,7 +1,7 @@
 import { SYMBOL_RAW_DATA } from '../types';
 
 export interface IRootFile {
-	['@']?: { version?: string },
+	['@']: { version?: string },
 	[key: string]: any,
 }
 export interface IManifest {
@@ -41,7 +41,7 @@ export interface TocElement
 export interface ISpine
 {
 	contents: ISpineContents,
-	toc?: TocElement,
+	toc: TocElement | null,
 
 	itemref?: Object[],
 }

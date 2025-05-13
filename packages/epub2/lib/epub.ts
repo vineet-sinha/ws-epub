@@ -41,26 +41,26 @@ import { IManifest, IMetadata, IMetadataList, INcx, INcxTree, IRootFile, ISpine,
  **/
 export class EPub extends EventEmitter
 {
-	metadata: IMetadata;
-	manifest: IMetadataList;
-	spine: ISpine;
-	flow: ISpineContents;
-	toc: ISpineContents;
+	metadata: IMetadata = {};
+	manifest: IMetadataList = {};
+	spine: ISpine = { toc: null, contents: [] };
+	flow: ISpineContents = [];
+	toc: ISpineContents = [];
 
-	ncx: INcx;
-	ncx_depth: number;
+	ncx: INcx = [];
+	ncx_depth: number = 0;
 
 	filename: string;
 	imageroot: string;
 	linkroot: string;
 
-	containerFile: string;
-	mimeFile: string;
-	rootFile: string;
+	containerFile?: string;
+	mimeFile?: string;
+	rootFile?: string;
 
-	zip: IZipFile;
+	zip: IZipFile = {} as IZipFile;
 
-	version: string;
+	version: string = '2.0';
 
 	protected _getStatic()
 	{
@@ -101,9 +101,9 @@ export class EPub extends EventEmitter
 	 **/
 	public parse()
 	{
-		this.containerFile = null;
-		this.mimeFile = null;
-		this.rootFile = null;
+		this.containerFile = undefined;
+		this.mimeFile = undefined;
+		this.rootFile = undefined;
 
 		this.metadata = {};
 		this.manifest = {};
@@ -155,7 +155,7 @@ export class EPub extends EventEmitter
 
 		for (i = 0, len = this.zip.names.length; i < len; i++)
 		{
-			if (this.zip.names[i].toLowerCase() == "mimetype")
+			if (this.zip.names[i]?.toLowerCase() == "mimetype")
 			{
 				this.mimeFile = this.zip.names[i];
 				break;
@@ -213,7 +213,7 @@ export class EPub extends EventEmitter
 		var i, len;
 		for (i = 0, len = this.zip.names.length; i < len; i++)
 		{
-			if (this.zip.names[i].toLowerCase() == "meta-inf/container.xml")
+			if (this.zip.names[i]?.toLowerCase() == "meta-inf/container.xml")
 			{
 				this.containerFile = this.zip.names[i];
 				break;
@@ -283,21 +283,14 @@ export class EPub extends EventEmitter
 
 				for (i = 0, len = this.zip.names.length; i < len; i++)
 				{
-					if (this.zip.names[i].toLowerCase() == (filename as any as string))
+					if (this.zip.names[i]?.toLowerCase() == (filename as any as string))
 					{
 						this.rootFile = this.zip.names[i];
 						break;
 					}
 				}
 
-				if (!this.rootFile)
-				{
-					this.emit("error", new Error("Rootfile not found from archive"));
-					return;
-				}
-
 				this.handleRootFile();
-
 			});
 
 			xmlparser.on("error", (err) =>
@@ -318,6 +311,12 @@ export class EPub extends EventEmitter
 	 **/
 	handleRootFile()
 	{
+		if (!this.rootFile)
+			{
+				this.emit("error", new Error("Rootfile not found from archive"));
+				return;
+			}
+
 		const xml2jsOptions = this._getStatic().xml2jsOptions;
 
 		this.zip.readFile(this.rootFile, (err, data) =>
@@ -358,21 +357,23 @@ export class EPub extends EventEmitter
 		keys = Object.keys(rootfile);
 		for (i = 0, len = keys.length; i < len; i++)
 		{
-			keyparts = keys[i].split(":");
+			const currKey = keys[i];
+			if (!currKey) continue;
+			keyparts = currKey.split(":");
 			key = (keyparts.pop() || "").toLowerCase().trim();
 			switch (key)
 			{
 				case "metadata":
-					this.parseMetadata(rootfile[keys[i]]);
+					this.parseMetadata(rootfile[currKey]);
 					break;
 				case "manifest":
-					this.parseManifest(rootfile[keys[i]]);
+					this.parseManifest(rootfile[currKey]);
 					break;
 				case "spine":
-					this.parseSpine(rootfile[keys[i]]);
+					this.parseSpine(rootfile[currKey]);
 					break;
 				case "guide":
-					//this.parseGuide(rootfile[keys[i]]);
+					//this.parseGuide(rootfile[currKey]);
 					break;
 			}
 		}
@@ -402,10 +403,12 @@ export class EPub extends EventEmitter
 		keys = Object.keys(metadata);
 		for (i = 0, len = keys.length; i < len; i++)
 		{
-			keyparts = keys[i].split(":");
+			const currKey = keys[i];
+			if (!currKey) continue;
+			keyparts = currKey.split(":");
 			key = (keyparts.pop() || "").toLowerCase().trim();
 
-			const currentData = metadata[keys[i]];
+			const currentData = metadata[currKey];
 
 			switch (key)
 			{
@@ -447,15 +450,13 @@ export class EPub extends EventEmitter
 					}
 					break;
 				case "subject":
-
-					this.metadata.subject = this.metadata.subject || [];
-
-					(Array.isArray(currentData) ? currentData : [currentData])
-						.forEach(function (value)
+					const currDataArr = Array.isArray(currentData) ? currentData : [currentData];
+					currDataArr.forEach(function (value)
 						{
 							let tag = (_meta_val(value, '#') || '').trim();
 							if (tag !== '')
 							{
+								if (!_self.metadata.subject) _self.metadata.subject = [];
 								_self.metadata.subject.push(tag);
 							}
 						})
@@ -601,7 +602,8 @@ export class EPub extends EventEmitter
 	 **/
 	parseManifest(manifest: IManifest)
 	{
-		var i, len, path = this.rootFile.split("/"), element, path_str;
+		var i, len, element, path_str;
+		const path = this.rootFile?.split("/") || [];
 		path.pop();
 		path_str = path.join("/");
 
@@ -609,9 +611,11 @@ export class EPub extends EventEmitter
 		{
 			for (i = 0, len = manifest.item.length; i < len; i++)
 			{
-				if (manifest.item[i]['@'])
+				const currItem = manifest.item[i];
+				if (!currItem) continue;
+				if (currItem['@'])
 				{
-					element = manifest.item[i]['@'];
+					element = currItem['@'];
 
 					element = this._Elem(element);
 
@@ -620,7 +624,8 @@ export class EPub extends EventEmitter
 						element.href = path.concat([element.href]).join("/");
 					}
 
-					this.manifest[manifest.item[i]['@'].id] = element;
+					if (!currItem['@'].id) continue;
+					this.manifest[currItem['@'].id] = element;
 
 				}
 			}
@@ -634,7 +639,8 @@ export class EPub extends EventEmitter
 	 **/
 	parseSpine(spine: SpineFragment)
 	{
-		var i, len, path = this.rootFile.split("/"), element;
+		var i, len, element;
+		const path = this.rootFile?.split("/") || [];
 		path.pop();
 
 		if (spine['@'] && spine['@'].toc)
@@ -650,9 +656,10 @@ export class EPub extends EventEmitter
 			}
 			for (i = 0, len = spine.itemref.length; i < len; i++)
 			{
-				if (spine.itemref[i]['@'])
+				const currIRef = spine.itemref[i];
+				if (currIRef && currIRef['@'] && currIRef['@'].idref)
 				{
-					if (element = this.manifest[spine.itemref[i]['@'].idref])
+					if (element = this.manifest[currIRef['@'].idref])
 					{
 						this.spine.contents.push(element);
 					}
@@ -669,19 +676,28 @@ export class EPub extends EventEmitter
 	 **/
 	parseTOC()
 	{
-		var i, len, path = this.spine.toc.href.split("/"), keys;
-		var id_list:Record<string, string> = {};
+		var i, len, keys;
+		const href = this.spine.toc?.href;
+		if (!href) {
+			this.emit("end");
+			return;
+		}
+
+		const path = href ? href.split("/") : [];
+		let id_list:Record<string, string> = {};
 		path.pop();
 
 		keys = Object.keys(this.manifest);
 		for (i = 0, len = keys.length; i < len; i++)
 		{
-			id_list[this.manifest[keys[i]].href] = keys[i];
+			const currKey = keys[i];
+			if (!currKey) continue;
+			id_list[this.manifest[currKey]?.href ?? ''] = currKey;
 		}
 
 		const xml2jsOptions = this._getStatic().xml2jsOptions;
 
-		this.zip.readFile(this.spine.toc.href,  (err, data) =>
+		this.zip.readFile(href,  (err, data) =>
 		{
 			if (err)
 			{
@@ -722,7 +738,7 @@ export class EPub extends EventEmitter
 	 *  Walks the NavMap object through all levels and finds elements
 	 *  for TOC
 	 **/
-	walkNavMap(branch: any, path: string[], id_list: Record<string, string>, level?: number, pe?: TocElement, parentNcx?: INcxTree, ncx_idx?: { index: any; }): Array<TocElement>
+	walkNavMap(branch: any, path: string[], id_list: Record<string, string>, level?: number, parentNcx?: INcxTree, ncx_idx?: { index: any; }): Array<TocElement>
 	{
 		ncx_idx = ncx_idx || {
 			index: 0,
@@ -787,10 +803,11 @@ export class EPub extends EventEmitter
 					href = path.concat([href]).join("/");
 					element.href = href;
 
-					if (id_list[element.href])
+					const elementId = id_list[element.href];
+					if (elementId && this.manifest[elementId])
 					{
 						// link existing object
-						element = this.manifest[id_list[element.href]];
+						element = this.manifest[elementId];
 
 						element.title = title;
 						element.order = order;
@@ -803,7 +820,7 @@ export class EPub extends EventEmitter
 						element.id = (branch[i]["@"] && branch[i]["@"].id || "").trim();
 					}
 
-					if (level == 0)
+					if (level == 0 && element.id)
 					{
 						let idx = this.ncx.length;
 
@@ -815,7 +832,7 @@ export class EPub extends EventEmitter
 							sub: [],
 						};
 					}
-					else if (parentNcx)
+					else if (parentNcx && element.id)
 					{
 						let idx = parentNcx.sub.length;
 
@@ -836,7 +853,7 @@ export class EPub extends EventEmitter
 
 			if (branch[i].navPoint)
 			{
-				output = output.concat(this.walkNavMap(branch[i].navPoint, path, id_list, level + 1, element, currentNcx, ncx_idx));
+				output = output.concat(this.walkNavMap(branch[i].navPoint, path, id_list, level + 1, currentNcx, ncx_idx));
 			}
 		}
 		return output;
@@ -850,7 +867,7 @@ export class EPub extends EventEmitter
 	 *  Finds a chapter text for an id. Replaces image and link URL's, removes
 	 *  <head> etc. elements. Return only chapters with mime type application/xhtml+xml
 	 **/
-	getChapter(chapterId: string, callback: (error: Error, text?: string) => void)
+	getChapter(chapterId: string, callback: (error: Error|null, text?: string) => void)
 	{
 		let self = this;
 
@@ -861,14 +878,25 @@ export class EPub extends EventEmitter
 				callback(err);
 				return;
 			}
+			if (!str)
+			{
+				callback(new Error("No data"));
+				return;
+			}
 
 			let meta = self.manifest[chapterId];
 
-			var i, len, path = this.rootFile.split("/"), keys = Object.keys(this.manifest);
+			var i, len, keys = Object.keys(this.manifest);
+			const path = this.rootFile?.split("/") || [];
 			path.pop();
 
+			if (!meta || !meta.href)
+			{
+				callback(new Error("No manifest entry"));
+				return;
+			}
 			let basePath = pathDirname(meta.href);
-			let baseHref = meta.href;
+			// let baseHref = meta.href;
 
 			// remove linebreaks (no multi line matches in JS regex!)
 			str = str.replace(/\r?\n/g, "\u0000");
@@ -906,15 +934,21 @@ export class EPub extends EventEmitter
 
 				for (i = 0, len = keys.length; i < len; i++)
 				{
+					let currKey = keys[i];
+					if (!currKey) continue;
+
+					let currManifest = self.manifest[currKey];
+					if (!currManifest || !currManifest.href) continue;
+
 					let _arr = [
-						self.manifest[keys[i]].href,
-						decodeURI(self.manifest[keys[i]].href),
-						encodeURI(self.manifest[keys[i]].href),
+						currManifest.href,
+						decodeURI(currManifest.href),
+						encodeURI(currManifest.href),
 					];
 
 					if (_arr.includes(img))
 					{
-						element = self.manifest[keys[i]];
+						element = self.manifest[currKey];
 						break;
 					}
 				}
@@ -965,9 +999,15 @@ export class EPub extends EventEmitter
 
 				for (i = 0, len = keys.length; i < len; i++)
 				{
-					if (this.manifest[keys[i]].href.split("#")[0] == link)
+					let currKey = keys[i];
+					if (!currKey) continue;
+
+					let currManifest = self.manifest[currKey];
+					if (!currManifest || !currManifest.href) continue;
+
+					if (currManifest.href.split("#")[0] == link)
 					{
-						element = this.manifest[keys[i]];
+						element = this.manifest[currKey];
 						break;
 					}
 				}
@@ -1003,25 +1043,26 @@ export class EPub extends EventEmitter
 	 *
 	 *  Returns the raw chapter text for an id.
 	 **/
-	getChapterRaw(chapterId: string, callback: (error: Error, text?: string) => void)
+	getChapterRaw(chapterId: string, callback: (error: Error|null, text?: string) => void)
 	{
-		if (this.manifest[chapterId])
+		const currManifest = this.manifest[chapterId];
+		if (currManifest && currManifest.href)
 		{
-			if (!(this.manifest[chapterId]['media-type'] == "application/xhtml+xml" || this.manifest[chapterId]['media-type'] == "image/svg+xml"))
+			if (!(currManifest['media-type'] == "application/xhtml+xml" || currManifest['media-type'] == "image/svg+xml"))
 			{
-				return callback(new Error(`Invalid mime type for chapter "${chapterId}" ${this.manifest[chapterId]['media-type']}`));
+				return callback(new Error(`Invalid mime type for chapter "${chapterId}" ${currManifest['media-type']}`));
 			}
 
-			this.zip.readFile(this.manifest[chapterId].href, (function (this: EPub, err: any, data: Buffer)
+			this.zip.readFile(currManifest.href, (function (this: EPub, err: any, data: Buffer)
 			{
 				if (err)
 				{
-					callback(new Error(`Reading archive failed "${chapterId}", ${this.manifest[chapterId].href}`));
+					callback(new Error(`Reading archive failed "${chapterId}", ${currManifest.href}`));
 					return;
 				}
 				else if (!data)
 				{
-					callback(new Error(`Reading archive failed "${chapterId}", ${this.manifest[chapterId].href}`));
+					callback(new Error(`Reading archive failed "${chapterId}", ${currManifest.href}`));
 					return;
 				}
 
@@ -1044,7 +1085,7 @@ export class EPub extends EventEmitter
 	 *  an error object, image buffer and image content-type.
 	 *  Return only images with mime type image
 	 **/
-	getImage(id: string, callback: (error: Error, data?: Buffer, mimeType?: string) => void)
+	getImage(id: string, callback: (error: Error|null, data?: Buffer, mimeType?: string) => void)
 	{
 		if (this.manifest[id])
 		{
@@ -1070,21 +1111,23 @@ export class EPub extends EventEmitter
 	 *  Finds a file for an id. Returns the file as Buffer. Callback gets
 	 *  an error object, file contents buffer and file content-type.
 	 **/
-	getFile(id: string, callback: (error: Error, data?: Buffer, mimeType?: string) => void)
+	getFile(id: string, callback: (error: Error|null, data?: Buffer, mimeType?: string) => void)
 	{
-		if (this.manifest[id])
-		{
-			let self = this;
+		let self = this;
+		const currManifest = self.manifest[id];
 
-			this.zip.readFile(this.manifest[id].href, (err, data) =>
+		if (currManifest && currManifest.href)
+		{
+
+			this.zip.readFile(currManifest.href, (err, data) =>
 			{
 				if (err)
 				{
-					callback(new Error(`Reading archive failed ${self.manifest[id].href}`));
+					callback(new Error(`Reading archive failed ${currManifest.href}`));
 					return;
 				}
 
-				callback(null, data, this.manifest[id]['media-type']);
+				callback(null, data, currManifest['media-type']);
 			});
 		}
 		else
